@@ -10,113 +10,171 @@ const Redirect = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [destinationUrl, setDestinationUrl] = useState('');
-  const hasIncremented = useRef(false); // Prevent multiple click increments
+  const hasIncremented = useRef(false);
+  const redirectAttempted = useRef(false);
 
   useEffect(() => {
-    // Skip if already processed this shortCode
-    if (hasIncremented.current) return;
+    // Prevent multiple execution
+    if (redirectAttempted.current) return;
+    redirectAttempted.current = true;
 
-    const findAndRedirect = (urlList, isFromContext = false) => {
-      const redirectUrl = urlList.find(url => url.shortCode === shortCode);
-      
-      if (redirectUrl) {
-        // Check if URL is expired
-        if (new Date(redirectUrl.expiresAt) < new Date()) {
-          setError('This shortened URL has expired');
-          setLoading(false);
-          return;
+    const findUrlAndRedirect = async () => {
+      try {
+        // Strategy 1: Check context first (fastest)
+        if (urls && urls.length > 0) {
+          const foundUrl = urls.find(url => url.shortCode === shortCode);
+          if (foundUrl) {
+            await processRedirect(foundUrl, true);
+            return;
+          }
         }
-        
-        // Store the destination URL
-        setDestinationUrl(redirectUrl.longUrl);
-        
-        // Mark as processed to prevent duplicate increments
-        hasIncremented.current = true;
-        
-        // Update click count in localStorage (ALWAYS)
-        updateClickCountInStorage(redirectUrl);
-        
-        // Also update React Context if available
-        if (isFromContext && incrementClicks) {
-          incrementClicks(redirectUrl.id);
+
+        // Strategy 2: Check localStorage (persistent storage)
+        const savedUrls = localStorage.getItem('urlShortenerData');
+        if (savedUrls) {
+          try {
+            const parsedUrls = JSON.parse(savedUrls);
+            const foundUrl = parsedUrls.find(url => url.shortCode === shortCode);
+            
+            if (foundUrl) {
+              await processRedirect(foundUrl, false);
+              return;
+            }
+          } catch (parseError) {
+            console.error('Error parsing localStorage data:', parseError);
+          }
         }
-        
-        // Redirect to original URL after a brief delay
-        setTimeout(() => {
-          window.location.href = redirectUrl.longUrl;
-        }, 2000);
-        
-      } else {
+
+        // If we get here, no URL was found
         setError(`Shortened URL "${shortCode}" not found`);
+        setLoading(false);
+
+      } catch (error) {
+        console.error('Redirect error:', error);
+        setError('An unexpected error occurred');
         setLoading(false);
       }
     };
 
-    // First check context (in-memory)
-    if (urls && urls.length > 0) {
-      findAndRedirect(urls, true);
-    } else {
-      // Fallback: check localStorage
-      const savedUrls = localStorage.getItem('urlShortenerData');
-      if (savedUrls) {
-        try {
-          const parsedUrls = JSON.parse(savedUrls);
-          findAndRedirect(parsedUrls, false);
-        } catch (error) {
-          setError('Error loading URL data from storage');
-          setLoading(false);
+    const processRedirect = async (urlData, fromContext) => {
+      // Check if URL is expired with proper date handling
+      const now = new Date();
+      let expiryDate;
+      
+      // Handle different date formats
+      if (urlData.expiresAt) {
+        if (typeof urlData.expiresAt === 'string') {
+          expiryDate = new Date(urlData.expiresAt);
+        } else if (urlData.expiresAt instanceof Date) {
+          expiryDate = urlData.expiresAt;
+        } else if (typeof urlData.expiresAt === 'number') {
+          expiryDate = new Date(urlData.expiresAt);
+        } else {
+          expiryDate = new Date();
         }
       } else {
-        setError('URL data not available. Please shorten a URL first.');
-        setLoading(false);
+        expiryDate = new Date();
       }
-    }
-  }, [shortCode, urls, incrementClicks]);
 
-  // Function to update click count in localStorage
-  const updateClickCountInStorage = (redirectUrl) => {
-    try {
-      const savedUrls = localStorage.getItem('urlShortenerData');
-      if (savedUrls) {
-        const parsedUrls = JSON.parse(savedUrls);
-        const updatedUrls = parsedUrls.map(url => {
-          if (url.id === redirectUrl.id) {
-            return {
-              ...url,
-              clicks: (url.clicks || 0) + 1, // Ensure clicks exists
-              clickData: [
-                ...(url.clickData || []),
-                {
-                  timestamp: new Date(),
-                  location: 'Unknown',
-                  source: 'Direct'
-                }
-              ]
-            };
-          }
-          return url;
-        });
-        
-        // Save updated URLs back to localStorage
-        localStorage.setItem('urlShortenerData', JSON.stringify(updatedUrls));
+      // Add a 1-minute buffer to account for any delays
+      const bufferMs = 60 * 1000; // 1 minute buffer
+      const expiryWithBuffer = new Date(expiryDate.getTime() + bufferMs);
+
+      console.log('Current time:', now.toISOString());
+      console.log('Expiry time:', expiryDate.toISOString());
+      console.log('Expiry with buffer:', expiryWithBuffer.toISOString());
+
+      if (now > expiryWithBuffer) {
+        setError('This shortened URL has expired');
+        setLoading(false);
+        return;
       }
-    } catch (error) {
-      console.error('Error updating click count in storage:', error);
-    }
-  };
+      
+      // Store destination URL for display
+      setDestinationUrl(urlData.longUrl);
+      
+      // Mark as processed to prevent duplicate increments
+      if (!hasIncremented.current) {
+        hasIncremented.current = true;
+        
+        // Update click count
+        await updateClickCount(urlData, fromContext);
+      }
+      
+      // Redirect after brief delay
+      setTimeout(() => {
+        // Ensure URL has protocol
+        let redirectUrl = urlData.longUrl;
+        if (!redirectUrl.startsWith('http://') && !redirectUrl.startsWith('https://')) {
+          redirectUrl = 'https://' + redirectUrl;
+        }
+        window.location.href = redirectUrl;
+      }, 1500);
+    };
+
+    const updateClickCount = async (urlData, fromContext) => {
+      try {
+        // Update in localStorage
+        const savedUrls = localStorage.getItem('urlShortenerData');
+        if (savedUrls) {
+          const parsedUrls = JSON.parse(savedUrls);
+          const updatedUrls = parsedUrls.map(url => {
+            if (url.id === urlData.id || url.shortCode === urlData.shortCode) {
+              const currentClicks = typeof url.clicks === 'number' ? url.clicks : 0;
+              return {
+                ...url,
+                clicks: currentClicks + 1,
+                lastClicked: new Date().toISOString(),
+                clickData: [
+                  ...(url.clickData || []),
+                  {
+                    timestamp: new Date().toISOString(),
+                    location: 'Direct',
+                    source: window.location.href,
+                    userAgent: navigator.userAgent
+                  }
+                ]
+              };
+            }
+            return url;
+          });
+          
+          localStorage.setItem('urlShortenerData', JSON.stringify(updatedUrls));
+          
+          // Update context to keep UI in sync
+          if (fromContext && incrementClicks) {
+            incrementClicks(urlData.id);
+          }
+          
+          // Dispatch storage event for other tabs
+          window.dispatchEvent(new StorageEvent('storage', {
+            key: 'urlShortenerData',
+            newValue: JSON.stringify(updatedUrls),
+            oldValue: savedUrls
+          }));
+        }
+      } catch (error) {
+        console.error('Error updating click count:', error);
+      }
+    };
+
+    // Start the redirect process
+    findUrlAndRedirect();
+
+  }, [shortCode, urls, incrementClicks]);
 
   if (loading) {
     return (
       <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" minHeight="60vh" p={3}>
-        <CircularProgress size={60} />
+        <CircularProgress size={60} thickness={4} />
         <Typography variant="h5" sx={{ mt: 3, mb: 1 }} align="center">
-          Redirecting you to...
+          🔄 Redirecting you to...
         </Typography>
-        <Typography variant="body1" sx={{ mb: 3 }} color="text.secondary" align="center">
-          {destinationUrl || 'Loading destination...'}
+        <Typography variant="body1" sx={{ mb: 3, wordBreak: 'break-all' }} color="text.secondary" align="center">
+          {destinationUrl || 'Loading...'}
         </Typography>
         <Typography variant="body2" color="text.secondary" align="center">
-          You will be automatically redirected in 2 seconds
+          You will be automatically redirected in 1.5 seconds
         </Typography>
       </Box>
     );
@@ -125,25 +183,29 @@ const Redirect = () => {
   if (error) {
     return (
       <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" minHeight="60vh" p={3}>
-        <Paper elevation={3} sx={{ p: 4, maxWidth: 500, textAlign: 'center' }}>
+        <Paper elevation={3} sx={{ p: 4, maxWidth: 500, textAlign: 'center', borderRadius: 2 }}>
           <Typography variant="h4" color="error" gutterBottom>
             ⚠️ Redirect Error
           </Typography>
-          <Typography variant="h6" sx={{ mb: 3 }} color="text.secondary">
+          <Typography variant="h6" sx={{ mb: 3, color: '#666' }}>
             {error}
           </Typography>
-          <Typography variant="body2" sx={{ mb: 3 }} color="text.secondary">
+          <Typography variant="body2" sx={{ mb: 3, color: '#888' }}>
             This usually happens if:
-            <br />• The URL was shortened in a different session
-            <br />• The browser was refreshed
-            <br />• The URL has been deleted or expired
+            <br />• The URL has expired
+            <br />• The short code is incorrect
+            <br />• The URL was deleted
           </Typography>
           <Button 
             variant="contained" 
             size="large"
             startIcon={<Home />}
             onClick={() => window.location.href = '/'}
-            sx={{ mt: 2 }}
+            sx={{ 
+              mt: 2,
+              bgcolor: '#1976d2',
+              '&:hover': { bgcolor: '#1565c0' }
+            }}
           >
             Return to URL Shortener
           </Button>
