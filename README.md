@@ -1,12 +1,108 @@
-# React + Vite
+# 🔗 URL Shortener 
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A fast and lightweight React-based URL Shortener that converts long URLs into short, shareable links.
+Built with scalability and real-world usability in mind.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## ✨ Features
 
-## Expanding the ESLint configuration
+* 🔗 Convert long URLs into short links instantly
+* ⚡ Fast client-side processing
+* 📋 One-click copy to clipboard
+* 🔄 Regenerate short links
+* 📱 Fully responsive design
+* ⚛️ Built using modern React (Functional Components + Hooks)
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+---
+
+## 🛠 Tech Stack
+
+* **Frontend:** React.js
+* **State Management:** React Hooks (`useState`)
+* **Styling:** (CSS / Tailwind / Styled Components)
+
+
+---
+
+## 🔗 Live Demo
+
+👉 **Live Link:**
+https://url-shortner-app1.netlify.app
+
+---
+
+## 📂 Installation & Setup
+
+### 1️⃣ Clone the repository
+
+```bash id="g8hs92"
+git clone https://github.com/arushi-codes/url-shortner.git
+```
+
+### 2️⃣ Navigate into the project directory
+
+```bash id="f72kjs"
+cd your-repo-name
+```
+
+### 3️⃣ Install dependencies
+
+```bash id="9sdfk3"
+npm install
+```
+
+### 4️⃣ Start development server
+
+```bash id="as7d92"
+npm start
+```
+
+The app will run on:
+
+```id="df82kd"
+http://localhost:3000
+```
+
+---
+
+## 🧠 How It Works
+
+1. User inputs a long URL.
+2. System generates a unique short identifier.
+3. The short link is created using that identifier.
+4. User can copy and share the shortened URL instantly.
+
+---
+
+## 🎯 Real-World Use Cases
+
+* 📲 Social media sharing
+* 📊 Marketing campaign tracking
+* 📩 Clean links for emails
+* 🔐 Controlled access redirection
+* 🧾 Link management systems
+
+---
+
+## 📈 Future Enhancements
+
+* Backend database integration for persistent storage
+* Click analytics dashboard
+* Custom alias support
+* Expiry-based short URLs
+* Authentication & user-based link management
+
+---
+
+## 👩‍💻 Author
+
+Built with clean component architecture and scalable link-generation logic.
+
+If you found this useful, feel free to ⭐ the repository.
+
+---
+
+## 📜 License
+
+This project is open-source and available under the MIT License.
